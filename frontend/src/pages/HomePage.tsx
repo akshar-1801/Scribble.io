@@ -3,8 +3,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { io } from "socket.io-client";
+import { useSocket } from "../context/SocketContext";
 
 export default function SkribblHomePage() {
+  const { setSocket } = useSocket();
   const floatingStyle = (index: number) => ({
     animation: `float 2s ease-in-out infinite`,
     animationDelay: `${index * 0.2}s`,
@@ -81,14 +84,39 @@ export default function SkribblHomePage() {
       return;
     }
 
+    console.log("Connecting to socket server...");
+    const socket = io("http://localhost:4000");
+
+    socket.on("connect", () => {
+      console.log("Connected to socket server!");
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+      alert("Failed to connect to game server. Please try again.");
+    });
+
+    // Generate user data
+    const userData = {
+      id: `user_${Math.random().toString(36).substring(2, 9)}`,
+      name: username,
+      avatar: avatarOptions[currentAvatar],
+    };
+
+    console.log("Joining random room with user data:", userData);
+
     // Save to localStorage
     localStorage.setItem("skr-name", username);
     localStorage.setItem("skr-avatar", avatarOptions[currentAvatar]);
+    localStorage.setItem("skr-userId", userData.id);
 
-    // Generate a random room ID
-    const roomId = Math.random().toString(36).substring(2, 8);
+    socket.on("roomJoined", (roomId) => {
+      console.log("Joined room:", roomId);
+      setSocket(socket);
+      navigate(`/room/${roomId}`, { state: { userData } });
+    });
 
-    navigate(`/room/${roomId}`);
+    socket.emit("joinRandomRoom", userData);
   };
 
   return (
